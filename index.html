@@ -65,6 +65,23 @@ function show(n){
 }
 function next(){show(current+1)}
 function prev(){show(current-1)}
+let vietnameseVoice = null;
+
+function loadVietnameseVoice(){
+  if(!('speechSynthesis' in window)) return null;
+  const voices = speechSynthesis.getVoices() || [];
+  // Ưu tiên giọng tiếng Việt (vi-VN), tránh iPhone/Cốc Cốc dùng nhầm giọng mặc định.
+  vietnameseVoice =
+    voices.find(v => (v.lang || '').toLowerCase() === 'vi-vn') ||
+    voices.find(v => (v.lang || '').toLowerCase().startsWith('vi'));
+  return vietnameseVoice;
+}
+
+if('speechSynthesis' in window){
+  loadVietnameseVoice();
+  speechSynthesis.onvoiceschanged = loadVietnameseVoice;
+}
+
 function speak(){
   stopSpeech();
   const text=pages[current-1].dataset.narration||'';
@@ -72,11 +89,28 @@ function speak(){
     alert('Trình duyệt chưa hỗ trợ đọc lời kể.');
     return;
   }
-  const u=new SpeechSynthesisUtterance(text);
-  u.lang='vi-VN'; u.rate=.9; u.pitch=1.02; u.volume=1;
-  const v=speechSynthesis.getVoices().find(x=>x.lang && x.lang.toLowerCase().startsWith('vi'));
-  if(v) u.voice=v;
-  speechSynthesis.speak(u);
+
+  // iPhone thường nạp danh sách giọng nói chậm hơn máy tính.
+  // Thử nạp lại vài lần để chắc chắn chọn đúng giọng tiếng Việt.
+  const speakWithVietnameseVoice = () => {
+    const u=new SpeechSynthesisUtterance(text);
+    u.lang='vi-VN';
+    u.rate=.9;
+    u.pitch=1.02;
+    u.volume=1;
+
+    const v = loadVietnameseVoice();
+    if(v) u.voice=v;
+
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  };
+
+  if(loadVietnameseVoice()){
+    speakWithVietnameseVoice();
+  }else{
+    setTimeout(speakWithVietnameseVoice, 150);
+  }
 }
 document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight'||e.key==='PageDown') next();
